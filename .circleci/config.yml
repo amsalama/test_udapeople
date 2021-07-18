@@ -41,6 +41,11 @@ jobs:
       - image: circleci/node:13.8.0
     steps:
       - checkout
+      - run:
+          name: Install dependencies
+          command: |
+            cd frontend
+            npm install
       # - restore_cache:
       #     keys: [frontend-build]
       - run:
@@ -58,6 +63,11 @@ jobs:
       - image: circleci/node:13.8.0
     steps:
       - checkout
+      - run:
+          name: Install dependencies
+          command: |
+            cd frontend
+            npm install
       - restore_cache:
           keys: [backend-build]
       - run:
