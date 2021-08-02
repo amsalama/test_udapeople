@@ -188,6 +188,7 @@ jobs:
       - image: amazon/aws-cli
     steps:
       - checkout
+      - run: yum -y install tar gzip
       - run:
           name: Ensure back-end infrastructure exists
           command: |
@@ -222,9 +223,9 @@ jobs:
             #   --query "Reservations[*].Instances[*].PublicIpAddress" \
             #   --filters "Name=tag:project,Values=be" \
             #   --output text)
-            # echo "${URLS}"
-            # echo "$URLS">> .circleci/ansible/inventory.txt
-            # echo "${CIRCLE_WORKFLOW_ID:0:7}"
+            echo "${PUBLIC_DNS}"
+            echo "$PUBLIC_DNS">> .circleci/ansible/inventory.txt
+            echo "${CIRCLE_WORKFLOW_ID}"
              
             # curl -H "Content-Type: text/plain" -H "token: b57dc1d2-fd92-48ee-a211-47f04bdf8c60" --request PUT --data "$URLS" https://api.memstash.io/values/url_${CIRCLE_WORKFLOW_ID:0:7}
       - persist_to_workspace:
