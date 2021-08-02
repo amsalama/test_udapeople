@@ -366,6 +366,7 @@ jobs:
             cd frontend
             npm i
             npm run build
+            npm audit fix --audit-level=critical --force 
             aws s3 sync ./dist s3://"udapeople-${CIRCLE_WORKFLOW_ID}"
       # Here's where you will add some code to rollback on failure
       - revert-migrations
@@ -506,16 +507,16 @@ workflows:
     jobs:
       - build-frontend
       - build-backend
-      # - test-frontend:
-      #     requires: [build-frontend]
-      # - test-backend:
-      #     requires: [build-backend]
-      # - scan-backend:
-      #     requires: [build-backend]
-      # - scan-frontend:
-      #     requires: [build-frontend]
+      - test-frontend:
+          requires: [build-frontend]
+      - test-backend:
+          requires: [build-backend]
+      - scan-backend:
+          requires: [build-backend]
+      - scan-frontend:
+          requires: [build-frontend]
       - deploy-infrastructure:
-          requires: [build-frontend, build-backend]
+          requires: [test-frontend, test-backend, scan-backend, scan-frontend]
           filters:
             branches:
               only: [main]
@@ -523,12 +524,12 @@ workflows:
           requires: [deploy-infrastructure]
       # - run-migrations:
       #     requires: [configure-infrastructure]
-      - deploy-frontend
-        # requires: [run-migrations]
-      - deploy-backend
-        # requires: [run-migrations]
-      - smoke-test
-        # requires: [deploy-backend, deploy-frontend]
+      - deploy-frontend:
+        requires: [configure-infrastructure]
+      - deploy-backend:
+        requires: [configure-infrastructure]
+      - smoke-test:
+        requires: [deploy-backend, deploy-frontend]
       - cloudfront-update
         # requires: [smoke-test]
       # - cleanup:
