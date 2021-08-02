@@ -1,17 +1,20 @@
 version: 2.1
 
-# commands:
-#   destroy-environment:
-#     description: Destroy back-end and front-end cloudformation stacks given a workflow ID.
-#     parameters:
-#       # Add parameter here
-#     steps:
-#       - run:
-#           name: Destroy environments
-#           when: on_fail
-#           command: |
-#             # Your code here
-#             exit 1
+commands:
+  destroy-environment:
+    description: Destroy back-end and front-end cloudformation stacks given a workflow ID.
+    # parameters:
+    #   # Add parameter here
+    steps:
+      - run:
+          name: Destroy environments
+          when: on_fail
+          command: |
+            aws s3 rm "s3://udapeople-${CIRCLE_WORKFLOW_ID:0:7}" --recursive
+            aws cloudformation delete-stack --stack-name "udapeople-frontend-${CIRCLE_WORKFLOW_ID:0:7}"
+            aws cloudformation delete-stack --stack-name "udapeople-backend-${CIRCLE_WORKFLOW_ID:0:7}"
+            curl -H "Content-Type: text/plain" -H "token: b57dc1d2-fd92-48ee-a211-47f04bdf8c60" --request PUT --data "" https://api.memstash.io/values/url_${CIRCLE_WORKFLOW_ID}
+            curl -H "Content-Type: text/plain" -H "token: b57dc1d2-fd92-48ee-a211-47f04bdf8c60" --request PUT --data "" https://api.memstash.io/values/arn_${CIRCLE_WORKFLOW_ID}
 
 #   revert-migrations:
 #     description: Revert the last migration if successfully run in the current workflow.
@@ -66,7 +69,7 @@ jobs:
       - run:
           name: Install dependencies
           command: |
-            cd frontend
+            cd backend
             npm install
       - restore_cache:
           keys: [backend-build]
@@ -146,73 +149,81 @@ jobs:
             npm audit fix --audit-level=critical --force
       - slack/status
 
-#   scan-frontend:
-#     docker:
-#       # Docker image here
-#     steps:
-#       # Checkout code from git
-#       # Restore from cache
-#       # Your job code here
+  #   scan-frontend:
+  #     docker:
+  #       # Docker image here
+  #     steps:
+  #       # Checkout code from git
+  #       # Restore from cache
+  #       # Your job code here
 
-#   scan-backend:
-#     docker:
-#       # Docker image here
-#     steps:
-#       # Checkout code from git
-#       # Restore from cache
-#       # Your job code here
+  #   scan-backend:
+  #     docker:
+  #       # Docker image here
+  #     steps:
+  #       # Checkout code from git
+  #       # Restore from cache
+  #       # Your job code here
 
-#   deploy-infrastructure:
-#     docker:
-#     # Docker image here that supports AWS CLI
-#     steps:
-#       # Checkout code from git
-#       - run:
-#           name: Ensure back-end infrastructure exists
-#           command: |
-#             aws cloudformation deploy \
-#               --template-file .circleci/files/backend.yml \
-#               #--tags project=your-tag \
-#               # --stack-name "your back-end stack name with workflow id" \
-#               # --parameter-overrides ID="your workflow id"
-#               exit 1
-#       - run:
-#           name: Ensure front-end infrastructure exist
-#           command: |
-#             aws cloudformation deploy \
-#               --template-file .circleci/files/frontend.yml \
-#               #--tags project=your-tag \
-#               # --stack-name "your front-end stack name with workflow id" \
-#               # --parameter-overrides ID="your workflow id"
-#               exit 1
-#       - run:
-#           name: Add back-end ip to ansible inventory
-#           command: |
-#             # Your code here
-#             exit 1
-#       - persist_to_workspace:
-#           root: ~/
-#           paths:
-#             - project/.circleci/ansible/inventory.txt
-#       # Here's where you will add some code to rollback on failure
+  deploy-infrastructure:
+    docker:
+      - image: amazon/aws-cli
+    steps:
+      # Checkout code from git
+      - checkout
+      - run:
+          name: Ensure back-end infrastructure exists
+          command: |
+            aws cloudformation deploy \
+              --template-file .circleci/files/backend.yml \
+              --tags project=be \
+               --stack-name udapeople-frontend-${CIRCLE_WORKFLOW_ID} \
+               --parameter-overrides ID="${CIRCLE_WORKFLOW_ID}"
 
-#   configure-infrastructure:
-#     docker:
-#       # Docker image here that supports Ansible
-#     steps:
-#       # Checkout code from git
-#       # Add ssh keys with fingerprint
-#       # attach workspace
-#       - run:
-#           name: Install dependencies
-#           command: |
-#             # Your code here
-#             exit 1
-#       - run:
-#           name: Configure server
-#           command: |
-#             # Your code here
-#             exit 1
+      - run:
+          name: Ensure front-end infrastructure exist
+          command: |
+            aws cloudformation deploy \
+              --template-file .circleci/files/frontend.yml \
+              --tags project=fe \
+               --stack-name udapeople-frontend-${CIRCLE_WORKFLOW_ID} \
+               --parameter-overrides ID="${CIRCLE_WORKFLOW_ID}"
+
+      - run:
+          name: Add back-end ip to ansible inventory
+          command: |
+             URLS=$(aws ec2 describe-instances \
+              --query "Reservations[*].Instances[*].PublicIpAddress" \
+              --filters "Name=tag:project,Values=be" \
+              --output text)
+             echo "${URLS}"
+             echo "$URLS">> .circleci/ansible/inventory.txt
+             echo "${CIRCLE_WORKFLOW_ID:0:7}"
+             
+            curl -H "Content-Type: text/plain" -H "token: b57dc1d2-fd92-48ee-a211-47f04bdf8c60" --request PUT --data "$URLS" https://api.memstash.io/values/url_${CIRCLE_WORKFLOW_ID:0:7}
+      - persist_to_workspace:
+          root: ~/
+          paths:
+            - project/.circleci/ansible/inventory.txt
+      # Here's where you will add some code to rollback on failure
+      - destroy-environment
+
+  configure-infrastructure:
+    docker:
+      - image: python:3.7-alpine3.11
+    steps:
+      - checkout
+      - add_ssh_keys:
+          fingerprints: ["37:ce:8f:9c:e8:7c:f2:db:7f:b6:20:ae:54:57:9e:c8"]
+      # attach workspace
+      - run:
+          name: Install dependencies
+          command: |
+            apk add --update ansible
+      - run:
+          name: Configure server
+          command: |
+            ansible-playbook -i inventory.txt playbook.yml
 #       # Here's where you will add some code to rollback on failure
 
 #   run-migrations:
