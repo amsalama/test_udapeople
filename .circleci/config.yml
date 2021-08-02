@@ -378,7 +378,7 @@ workflows:
       # - scan-frontend:
       #     requires: [build-frontend]
       - deploy-infrastructure:
-          requires: [build-frontend, buil-backend]
+          requires: [build-frontend, build-backend]
           filters:
             branches:
               only: [main]
