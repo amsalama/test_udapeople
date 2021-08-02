@@ -130,34 +130,38 @@ jobs:
           paths: [backend/node_modules]
           key: backend-build
       - slack/status
-  analyze-frontend:
+  scan-frontend:
     docker:
       - image: circleci/node:13.8.0
     steps:
       - checkout
+      - restore_cache:
+          keys: [frontend-build]
+      # - run:
+      #     name: Install dependencies
+      #     command: |
+      #       cd frontend
+      #       npm install
       - run:
-          name: Install dependencies
-          command: |
-            cd frontend
-            npm install
-      - run:
-          name: Analyze the code
+          name: scan the code
           command: |
             cd frontend
             npm audit fix --audit-level=critical --force
       - slack/status
-  analyze-backend:
+  scan-backend:
     docker:
       - image: circleci/node:13.8.0
     steps:
       - checkout
+      - restore_cache:
+          keys: [backend-build]
+      # - run:
+      #     name: Install dependencies
+      #     command: |
+      #       cd backend
+      #       npm install
       - run:
-          name: Install dependencies
-          command: |
-            cd backend
-            npm install
-      - run:
-          name: Analyze the code
+          name: scan the code
           command: |
             cd backend
             npm audit fix --audit-level=critical --force
@@ -183,7 +187,6 @@ jobs:
     docker:
       - image: amazon/aws-cli
     steps:
-      # Checkout code from git
       - checkout
       - run:
           name: Ensure back-end infrastructure exists
@@ -191,8 +194,8 @@ jobs:
             aws cloudformation deploy \
               --template-file .circleci/files/backend.yml \
               --tags project=be \
-               --stack-name udapeople-frontend-${CIRCLE_WORKFLOW_ID} \
-               --parameter-overrides ID="${CIRCLE_WORKFLOW_ID}"
+              --stack-name udapeople-frontend-${CIRCLE_WORKFLOW_ID} \
+              --parameter-overrides ID="${CIRCLE_WORKFLOW_ID}"
 
       - run:
           name: Ensure front-end infrastructure exist
@@ -200,21 +203,28 @@ jobs:
             aws cloudformation deploy \
               --template-file .circleci/files/frontend.yml \
               --tags project=fe \
-               --stack-name udapeople-frontend-${CIRCLE_WORKFLOW_ID} \
-               --parameter-overrides ID="${CIRCLE_WORKFLOW_ID}"
+              --stack-name udapeople-frontend-${CIRCLE_WORKFLOW_ID} \
+              --parameter-overrides ID="${CIRCLE_WORKFLOW_ID}"
 
       - run:
           name: Add back-end ip to ansible inventory
           command: |
-            URLS=$(aws ec2 describe-instances \
-              --query "Reservations[*].Instances[*].PublicIpAddress" \
-              --filters "Name=tag:project,Values=be" \
-              --output text)
-            echo "${URLS}"
-            echo "$URLS">> .circleci/ansible/inventory.txt
-            echo "${CIRCLE_WORKFLOW_ID:0:7}"
+            PUBLIC_DNS=$(aws ec2 describe-instances --region ${AWS_DEFAULT_REGION} --filters 'Name=tag:Name,Values=udapeople-backend-ec2-*' --query "Reservations[*].Instances[0].PublicDnsName" --output text)
+            echo ${PUBLIC_DNS}
+            curl -H "Content-Type: text/plain" \
+               -H "token: ${CIRCLE_WORKFLOW_ID}" \
+               --request PUT \
+               --data ${PUBLIC_DNS} \
+               https://api.memstash.io/values/public_dns
+            # URLS=$(aws ec2 describe-instances \
+            #   --query "Reservations[*].Instances[*].PublicIpAddress" \
+            #   --filters "Name=tag:project,Values=be" \
+            #   --output text)
+            # echo "${URLS}"
+            # echo "$URLS">> .circleci/ansible/inventory.txt
+            # echo "${CIRCLE_WORKFLOW_ID:0:7}"
              
-            curl -H "Content-Type: text/plain" -H "token: b57dc1d2-fd92-48ee-a211-47f04bdf8c60" --request PUT --data "$URLS" https://api.memstash.io/values/url_${CIRCLE_WORKFLOW_ID:0:7}
+            # curl -H "Content-Type: text/plain" -H "token: b57dc1d2-fd92-48ee-a211-47f04bdf8c60" --request PUT --data "$URLS" https://api.memstash.io/values/url_${CIRCLE_WORKFLOW_ID:0:7}
       - persist_to_workspace:
           root: ~/
           paths:
@@ -361,15 +371,15 @@ workflows:
           requires: [build-frontend]
       - test-backend:
           requires: [build-backend]
-      # - scan-backend:
-      #     requires: [build-backend]
-      # - scan-frontend:
-      #     requires: [build-frontend]
-      # - deploy-infrastructure:
-      #     requires: [test-frontend, test-backend, scan-frontend, scan-backend]
-      #     filters:
-      #       branches:
-      #         only: [test-feature-branch]
+      - scan-backend:
+          requires: [build-backend]
+      - scan-frontend:
+          requires: [build-frontend]
+      - deploy-infrastructure:
+          requires: [test-frontend, test-backend, scan-frontend, scan-backend]
+          filters:
+            branches:
+              only: [master]
       # - configure-infrastructure:
       #     requires: [deploy-infrastructure]
       # - run-migrations:
