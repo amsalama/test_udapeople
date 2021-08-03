@@ -406,8 +406,8 @@ jobs:
           command: |
             cat .circleci/ansible/inventory.txt
             ansible-playbook -i .circleci/ansible/inventory.txt .circleci/ansible/deploy-backend.yml
-      - revert-migrations
-      - destroy-environment
+      # - revert-migrations
+      # - destroy-environment
   smoke-test:
     docker:
       - image: python:3.7-alpine3.11
