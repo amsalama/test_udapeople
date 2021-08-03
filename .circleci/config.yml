@@ -398,10 +398,13 @@ jobs:
       - run:
           name: "tar archiv"
           command: |
+            pwd
+            ls -l 
             tar -cf backend.tar ./backend/dist
       - run:
           name: Deploy backend
           command: |
+            cat .circleci/ansible/inventory.txt
             ansible-playbook -i .circleci/ansible/inventory.txt .circleci/ansible/deploy-backend.yml
       - revert-migrations
       - destroy-environment
