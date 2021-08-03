@@ -1,6 +1,5 @@
 - name: "Copy Compiled Back-End Files to EC2"
   become: true
-  user: ubuntu
   copy:
     src: /root/project/backend.tar
     dest: /home/ubuntu/backend/
